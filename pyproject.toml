@@ -1,0 +1,18 @@
+[project]
+name = "number-plate-recognition"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "deexor64", email = "191124667+deexor64@users.noreply.github.com"},
+]
+dependencies = []
+requires-python = "==3.12.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.scripts]
+start = "python3 src/main.py"
