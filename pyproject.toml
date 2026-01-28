@@ -5,7 +5,7 @@ description = "Number plate recognition tool with python"
 authors = [
     {name = "deexor64", email = "191124667+deexor64@users.noreply.github.com"},
 ]
-dependencies = ["opencv-python>=4.13.0.90", "numpy>=2.4.1", "tensorflow>=2.20.0", "jupyterlab>=4.5.2"]
+dependencies = ["opencv-python>=4.13.0.90", "numpy>=2.4.1"]
 requires-python = "==3.12.*"
 readme = "README.md"
 license = {text = "MIT"}
