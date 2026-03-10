@@ -1,5 +1,6 @@
 from detect import detect_plates, save_results, show_results
 
+
 def main():
     # Run detection and preprocessing
     print("Log: Begin detection")
@@ -10,7 +11,7 @@ def main():
         return
 
     # Display results summary
-    print(f"\n📊 SUMMARY")
+    print("\n📊 SUMMARY")
     print("-" * 20)
     print(f"Plates detected: {len(results['detections'])}")
     print(f"Plates processed: {len([p for p in results['processed_plates'] if p])}")
@@ -22,11 +23,6 @@ def main():
 
     # Show visual results
     show_results(results)
-
-    # Optional: save results
-    save_choice = input("\nSave results? (y/n): ").lower().startswith("y")
-    if save_choice:
-        save_results(results)
 
     print("✅ Complete!")
 
