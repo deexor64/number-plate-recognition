@@ -1,30 +1,39 @@
-from detect import detect_plates, show_results
+import cv2 as cv
+
+from extract_plate import extract_plate
+from perform_ocr import perform_ocr
+from preprocess_plate import preprocess_plate
 
 
 def main():
     # Run detection and preprocessing
     print("Log: Begin detection")
 
-    results = detect_plates("images/car-sl.jpg", show_preprocessing=False)
+    # Extract the plate from the image
+    results = extract_plate("images/car-6366999_1920.jpg")
 
     if results is None:
         return
 
-    # Display results summary
-    print("\n📊 SUMMARY")
-    print("-" * 20)
-    print(f"Plates detected: {len(results['detections'])}")
-    print(f"Plates processed: {len([p for p in results['processed_plates'] if p])}")
+    cv.imshow("cropped_image", results["cropped_image"])
+    cv.waitKey(0)
+    cv.destroyAllWindows()
 
-    for i, detection in enumerate(results["detections"]):
-        x, y, w, h = detection["coords"]
-        conf = detection["confidence"]
-        print(f"  Plate {i + 1}: ({x}, {y}) {w}×{h} confidence={conf:.3f}")
+    # Preprocess the extracted plate
+    processed = preprocess_plate(results["cropped_image"])
 
-    # Show visual results
-    show_results(results)
+    if processed is None:
+        return
 
-    print("✅ Complete!")
+    cv.imshow("processed_plate", processed["final"])
+    cv.waitKey(0)
+    cv.destroyAllWindows()
+
+    # Perform OCR on the processed image
+    plate_text = perform_ocr(processed["final"])
+    print(f"Plate text: {plate_text}")
+
+    print("Log: Complete!")
 
 
 if __name__ == "__main__":

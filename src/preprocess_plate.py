@@ -1,8 +1,16 @@
 import cv2 as cv
 import numpy as np
 
-# Resize plate to optimal width while maintaining aspect ratio.
-# Larger images are generally better for character recognition.
+
+def gray_scale(image):
+    if len(image.shape) == 3:
+        gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+    else:
+        gray = image
+
+    return gray
+
+
 def resize_plate(image, target_width=300):
     height, width = image.shape[:2]
     if width < target_width:
@@ -14,14 +22,12 @@ def resize_plate(image, target_width=300):
         )
     return image
 
-# Remove noise using Gaussian blur and bilateral filtering.
-# Bilateral filter reduces noise while preserving edges.
+
 def reduce_noise(image):
     denoised = cv.bilateralFilter(image, 9, 75, 75)
     return denoised
 
-# Improve contrast using CLAHE (Contrast Limited Adaptive Histogram Equalization).
-# Works better than regular histogram equalization for varying lighting.
+
 def enhance_contrast(image):
     if len(image.shape) == 3:
         # Convert to LAB color space for better contrast enhancement
@@ -40,69 +46,62 @@ def enhance_contrast(image):
         clahe = cv.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         return clahe.apply(image)
 
-# Sharpen the image to make character edges more defined.
-# Uses a simple sharpening kernel.
+
 def sharpen_image(image):
     # Create sharpening kernel
     kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
 
     return cv.filter2D(image, -1, kernel)
 
-# Convert to grayscale and apply adaptive thresholding.
-# This creates a binary image ideal for character recognition. 
-def prepare_for_ocr(image):
-    # Convert to grayscale if needed
-    if len(image.shape) == 3:
-        gray = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
-    else:
-        gray = image
 
-    # Apply adaptive threshold for better text segmentation
-    binary = cv.adaptiveThreshold(
-        gray, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2
-    )
+# def clean_noise(binary_image):
+#     """
+#     DIP Technique: Morphological Opening/Closing to remove noise.
+#     """
+#     # Create a small 3x3 kernel
+#     kernel = np.ones((3, 3), np.uint8)
 
-    return binary
+#     # 1. Opening: Removes small white noise (dots) from the background
+#     # 2. Closing: Fills small black holes inside characters
+#     # Since our license plates usually have black text on white backgrounds,
+#     # we need to be careful with which one we apply.
+
+#     # Let's use Median Blur first - it's the 'king' of removing salt-and-pepper noise
+#     cleaned = cv.medianBlur(binary_image, 3)
+
+#     # Morphological Opening to remove small 'specks'
+#     cleaned = cv.morphologyEx(cleaned, cv.MORPH_OPEN, kernel)
+
+#     return cleaned
+
 
 # Apply complete preprocessing pipeline to a license plate image
-def preprocess_plate(plate_image, show_steps=False):
+def preprocess_plate(plate_image):
     if plate_image is None or plate_image.size == 0:
         return None
 
-    # Store results
-    results = {"original": plate_image.copy()}
-    current = plate_image.copy()
+    # Convert to grayscale
+    current = gray_scale(plate_image)
+    results = {"gray": current.copy()}
 
     # Resize for optimal processing
     current = resize_plate(current)
     results["resized"] = current.copy()
-    if show_steps:
-        cv.imshow("1. Resized", current)
+    results["final"] = current.copy()
 
     # Reduce noise
     current = reduce_noise(current)
     results["denoised"] = current.copy()
-    if show_steps:
-        cv.imshow("2. Denoised", current)
+    results["final"] = current.copy()
 
     # Enhance contrast
     current = enhance_contrast(current)
     results["contrast_enhanced"] = current.copy()
-    if show_steps:
-        cv.imshow("3. Contrast Enhanced", current)
+    results["final"] = current.copy()
 
     # Sharpen image
     current = sharpen_image(current)
     results["sharpened"] = current.copy()
-    if show_steps:
-        cv.imshow("4. Sharpened", current)
-
-    # Prepare for OCR (grayscale + threshold)
-    current = prepare_for_ocr(current)
     results["final"] = current.copy()
-    if show_steps:
-        cv.imshow("5. Final (OCR Ready)", current)
-        cv.waitKey(0)
-        cv.destroyAllWindows()
 
     return results
