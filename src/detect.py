@@ -5,51 +5,65 @@ import numpy as np
 
 from preprocess import preprocess_plate
 
-# Configuration
-CONFIDENCE_THRESHOLD = 0.5
-NMS_THRESHOLD = 0.4
-INPUT_SIZE = 416
+
+class AppConfig:
+    """
+    Configuration class for the application.
+    """
+
+    CONFIDENCE_THRESHOLD = 0.5
+    NMS_THRESHOLD = 0.4
+    INPUT_SIZE = 416
+    MODEL_CONFIG = "model/config/darknet-yolov3.cfg"
+    MODEL_WEIGHTS = "model/weights/model.weights"
+    PLATE_PADDING = 10
+    OUTPUT_DIR = "output"
+    FONT = cv.FONT_HERSHEY_SIMPLEX
+    FONT_SCALE = 0.6
+    FONT_THICKNESS = 2
+    FONT_COLOR = (0, 0, 0)
+    BG_COLOR = (0, 255, 0)
 
 
 # Load YOLO model
-def load_network():
+def load_network(config_path, weights_path):
     print("Log: Loading network...")
-    net = cv.dnn.readNetFromDarknet(
-        "model/config/darknet-yolov3.cfg", "model/weights/model.weights"
-    )
+    net = cv.dnn.readNetFromDarknet(config_path, weights_path)
     net.setPreferableBackend(cv.dnn.DNN_BACKEND_OPENCV)
     net.setPreferableTarget(cv.dnn.DNN_TARGET_CPU)
     return net
 
 
 # Preprocess image for cnn
-def preprocess(image):
+def preprocess(image, config):
     blob = cv.dnn.blobFromImage(
-        image, 1 / 255.0, (INPUT_SIZE, INPUT_SIZE), (0, 0, 0), True, crop=False
+        image,
+        1 / 255.0,
+        (config.INPUT_SIZE, config.INPUT_SIZE),
+        (0, 0, 0),
+        True,
+        crop=False,
     )
     return blob
 
 
 # Get output layer names (OpenCV version compatibility)
 def get_outputs(net):
-    layers = net.getLayerNames()
-    unconnected = net.getUnconnectedOutLayers()
-
-    if len(unconnected.shape) > 1:
-        return [layers[i[0] - 1] for i in unconnected]
-    else:
-        return [layers[i - 1] for i in unconnected]
+    layer_names = net.getLayerNames()
+    output_layers = [
+        layer_names[i - 1] for i in net.getUnconnectedOutLayers().flatten()
+    ]
+    return output_layers
 
 
 # Extract valid detections from network outputs
-def extract_detections(outputs, w, h):
+def extract_detections(outputs, w, h, config):
     detections = []
 
     for output in outputs:
         for detection in output:
-            confidence = detection[5] if len(detection) > 5 else detection[4]
-
-            if confidence > CONFIDENCE_THRESHOLD:
+            confidence = detection[5]
+            if confidence > config.CONFIDENCE_THRESHOLD:
                 center_x = int(detection[0] * w)
                 center_y = int(detection[1] * h)
                 width = int(detection[2] * w)
@@ -65,39 +79,38 @@ def extract_detections(outputs, w, h):
 
 
 # Apply Non-Maximum Suppression to remove duplicates
-def apply_nms(detections):
+def apply_nms(detections, config):
     if not detections:
         return []
 
     boxes = [d["coords"] for d in detections]
     confidences = [d["confidence"] for d in detections]
 
-    indices = cv.dnn.NMSBoxes(boxes, confidences, CONFIDENCE_THRESHOLD, NMS_THRESHOLD)
+    indices = cv.dnn.NMSBoxes(
+        boxes, confidences, config.CONFIDENCE_THRESHOLD, config.NMS_THRESHOLD
+    )
+
+    if hasattr(indices, "flatten"):
+        indices = indices  # .flatten()
 
     if len(indices) > 0:
-        if hasattr(indices[0], "__len__"):
-            indices = [i[0] for i in indices]
-        else:
-            indices = indices.flatten() if hasattr(indices, "flatten") else indices
-
         return [detections[i] for i in indices]
 
     return []
 
 
 # Extract license plate regions from detected areas
-def extract_plate_regions(image, detections):
+def extract_plate_regions(image, detections, config):
     plate_regions = []
 
     for i, detection in enumerate(detections):
         x, y, w, h = detection["coords"]
 
         # Add padding around detected region
-        padding = 10
-        x_start = max(0, x - padding)
-        y_start = max(0, y - padding)
-        x_end = min(image.shape[1], x + w + padding)
-        y_end = min(image.shape[0], y + h + padding)
+        x_start = max(0, x - config.PLATE_PADDING)
+        y_start = max(0, y - config.PLATE_PADDING)
+        x_end = min(image.shape[1], x + w + config.PLATE_PADDING)
+        y_end = min(image.shape[0], y + h + config.PLATE_PADDING)
 
         # Extract plate region
         plate_region = image[y_start:y_end, x_start:x_end]
@@ -115,84 +128,55 @@ def extract_plate_regions(image, detections):
     return plate_regions
 
 
+# Draw a single bounding box on the image
+def draw_bounding_box(image, detection, index, config, processed_available=False):
+    x, y, w, h = detection["coords"]
+    conf = detection["confidence"]
+
+    # Draw green box
+    cv.rectangle(image, (x, y), (x + w, y + h), config.BG_COLOR, 2)
+
+    # Create label
+    status = "Processed" if processed_available else "Detected"
+    label = f"Plate {index + 1}: {status} ({conf:.2f})"
+
+    # Draw label background
+    (text_width, text_height), _ = cv.getTextSize(
+        label, config.FONT, config.FONT_SCALE, config.FONT_THICKNESS
+    )
+    cv.rectangle(
+        image, (x, y - text_height - 10), (x + text_width, y), config.BG_COLOR, -1
+    )
+
+    # Draw label text
+    cv.putText(
+        image,
+        label,
+        (x, y - 5),
+        config.FONT,
+        config.FONT_SCALE,
+        config.FONT_COLOR,
+        config.FONT_THICKNESS,
+    )
+
+
 # Draw bounding boxes on image
-def draw_results(image, detections, processed_available=False):
+def draw_results(image, detections, config, processed_available=False):
     result = image.copy()
 
     for i, detection in enumerate(detections):
-        x, y, w, h = detection["coords"]
-        conf = detection["confidence"]
-
-        # Draw green box
-        cv.rectangle(result, (x, y), (x + w, y + h), (0, 255, 0), 2)
-
-        # Create label
-        status = "Processed" if processed_available else "Detected"
-        label = f"Plate {i + 1}: {status} ({conf:.2f})"
-
-        # Draw label background
-        (text_width, text_height), _ = cv.getTextSize(
-            label, cv.FONT_HERSHEY_SIMPLEX, 0.6, 2
-        )
-        cv.rectangle(
-            result, (x, y - text_height - 10), (x + text_width, y), (0, 255, 0), -1
-        )
-
-        # Draw label text
-        cv.putText(
-            result, label, (x, y - 5), cv.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2
-        )
+        draw_bounding_box(result, detection, i, config, processed_available)
 
     return result
 
 
-def detect_plates(image_path, show_preprocessing=False):
-    # Load image
-    print(f"+ Image path: {image_path}")
-
-    image = cv.imread(image_path)
-    if image is None:
-        print("Error: Could not load image")
-        return None
-    
-    # Image exists
-    print(f"+ Image size: {image.shape[1]}×{image.shape[0]}")
-
-    # Detect license plates using YOLO
-    net = load_network()
-    blob = preprocess(image)
-    net.setInput(blob)
-
-    print("Log: Running detection...")
-    outputs = net.forward(get_outputs(net))
-
-    detections = extract_detections(outputs, image.shape[1], image.shape[0])
-    final_detections = apply_nms(detections)
-
-    print(f"Log: Found {len(final_detections)} license plate(s)")
-
-    if not final_detections:
-        return {
-            "detections": [], 
-            "processed_plates": [], 
-            "result_image": image
-        }
-
-    # Extract plate regions
-    plate_regions = extract_plate_regions(image, final_detections)
-
-    # Apply preprocessing to each detected plate
+def preprocess_plates(plate_regions, show_preprocessing=False):
     processed_plates = []
-    
-    # Preprocess detected plates to extract characters
     for plate_info in plate_regions:
         print(f"Log: Preprocessing plate {plate_info['index'] + 1}...")
-
-        # Apply image preprocessing
         preprocessing_results = preprocess_plate(
             plate_info["image"], show_steps=show_preprocessing
         )
-
         if preprocessing_results:
             processed_plates.append(
                 {
@@ -207,10 +191,54 @@ def detect_plates(image_path, show_preprocessing=False):
         else:
             processed_plates.append(None)
             print(f"Error: Failed to preprocess plate {plate_info['index'] + 1}")
+    return processed_plates
+
+
+def run_detection(net, image, config):
+    blob = preprocess(image, config)
+    net.setInput(blob)
+
+    print("Log: Running detection...")
+    outputs = net.forward(get_outputs(net))
+
+    detections = extract_detections(outputs, image.shape[1], image.shape[0], config)
+    return apply_nms(detections, config)
+
+
+def detect_plates(
+    image_path,
+    config=AppConfig(),
+    show_preprocessing=False,
+):
+    # Load image
+    print(f"+ Image path: {image_path}")
+
+    image = cv.imread(image_path)
+    if image is None:
+        print("Error: Could not load image")
+        return None
+
+    # Image exists
+    print(f"+ Image size: {image.shape[1]}×{image.shape[0]}")
+
+    # Detect license plates using YOLO
+    net = load_network(config.MODEL_CONFIG, config.MODEL_WEIGHTS)
+    final_detections = run_detection(net, image, config)
+
+    print(f"Log: Found {len(final_detections)} license plate(s)")
+
+    if not final_detections:
+        return {"detections": [], "processed_plates": [], "result_image": image}
+
+    # Extract plate regions
+    plate_regions = extract_plate_regions(image, final_detections, config)
+
+    # Apply preprocessing to each detected plate
+    processed_plates = preprocess_plates(plate_regions, show_preprocessing)
 
     # Create result image
     result_image = draw_results(
-        image, final_detections, processed_available=bool(processed_plates)
+        image, final_detections, config, processed_available=bool(processed_plates)
     )
 
     return {
@@ -221,7 +249,46 @@ def detect_plates(image_path, show_preprocessing=False):
     }
 
 
-def show_results(results):
+def show_plate_comparison(i, plate_data, config):
+    # Resize for consistent display
+    original = cv.resize(plate_data["original"], (300, 100))
+
+    # Convert final (grayscale) to BGR for comparison
+    final = plate_data["final"]
+    if len(final.shape) == 2:
+        final_bgr = cv.cvtColor(final, cv.COLOR_GRAY2BGR)
+    else:
+        final_bgr = final
+
+    final_display = cv.resize(final_bgr, (300, 100))
+
+    # Create side-by-side comparison
+    comparison = np.hstack([original, final_display])
+
+    # Add labels
+    cv.putText(
+        comparison,
+        "Original",
+        (10, 20),
+        config.FONT,
+        config.FONT_SCALE,
+        config.BG_COLOR,
+        config.FONT_THICKNESS,
+    )
+    cv.putText(
+        comparison,
+        "Preprocessed",
+        (310, 20),
+        config.FONT,
+        config.FONT_SCALE,
+        config.BG_COLOR,
+        config.FONT_THICKNESS,
+    )
+
+    cv.imshow(f"Plate {i + 1}: Before vs After", comparison)
+
+
+def show_results(results, config=AppConfig()):
     """Display detection and preprocessing results."""
     if not results or not results["detections"]:
         print("No results to display")
@@ -233,65 +300,32 @@ def show_results(results):
     # Show individual plate comparisons
     for i, plate_data in enumerate(results["processed_plates"]):
         if plate_data:
-            # Resize for consistent display
-            original = cv.resize(plate_data["original"], (300, 100))
-
-            # Convert final (grayscale) to BGR for comparison
-            final = plate_data["final"]
-            if len(final.shape) == 2:
-                final_bgr = cv.cvtColor(final, cv.COLOR_GRAY2BGR)
-            else:
-                final_bgr = final
-
-            final_display = cv.resize(final_bgr, (300, 100))
-
-            # Create side-by-side comparison
-            comparison = np.hstack([original, final_display])
-
-            # Add labels
-            cv.putText(
-                comparison,
-                "Original",
-                (10, 20),
-                cv.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                (0, 255, 0),
-                2,
-            )
-            cv.putText(
-                comparison,
-                "Preprocessed",
-                (310, 20),
-                cv.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                (0, 255, 0),
-                2,
-            )
-
-            cv.imshow(f"Plate {i + 1}: Before vs After", comparison)
+            show_plate_comparison(i, plate_data, config)
 
     print("Press any key to close windows...")
     cv.waitKey(0)
     cv.destroyAllWindows()
 
 
-def save_results(results, output_dir="output"):
+def save_results(results, config=AppConfig()):
     """Save processing results to files."""
     if not results or not results["detections"]:
         return
 
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(config.OUTPUT_DIR, exist_ok=True)
 
     # Save main result
-    cv.imwrite(f"{output_dir}/detection_result.jpg", results["result_image"])
+    cv.imwrite(f"{config.OUTPUT_DIR}/detection_result.jpg", results["result_image"])
 
     # Save individual plates
     for i, plate_data in enumerate(results["processed_plates"]):
         if plate_data:
             cv.imwrite(
-                f"{output_dir}/plate_{i + 1}_original.jpg", plate_data["original"]
+                f"{config.OUTPUT_DIR}/plate_{i + 1}_original.jpg",
+                plate_data["original"],
             )
-            cv.imwrite(f"{output_dir}/plate_{i + 1}_processed.jpg", plate_data["final"])
+            cv.imwrite(
+                f"{config.OUTPUT_DIR}/plate_{i + 1}_processed.jpg", plate_data["final"]
+            )
 
-    print(f"💾 Results saved to {output_dir}/")
-    
+    print(f"💾 Results saved to {config.OUTPUT_DIR}/")

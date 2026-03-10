@@ -16,3 +16,8 @@ distribution = false
 
 [tool.pdm.scripts]
 start = "python3 src/main.py"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.5",
+]
