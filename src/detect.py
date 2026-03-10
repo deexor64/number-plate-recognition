@@ -6,11 +6,7 @@ import numpy as np
 from preprocess import preprocess_plate
 
 
-class AppConfig:
-    """
-    Configuration class for the application.
-    """
-
+class ModelConfig:
     CONFIDENCE_THRESHOLD = 0.5
     NMS_THRESHOLD = 0.4
     INPUT_SIZE = 416
@@ -75,28 +71,17 @@ def extract_detections(outputs, w, h, config):
                     {"coords": (x, y, width, height), "confidence": float(confidence)}
                 )
 
-    return detections
+    if not detections:
+        return []
+
+    # Return only the best detection
+    best_detection = max(detections, key=lambda x: x["confidence"])
+    return [best_detection]
 
 
 # Apply Non-Maximum Suppression to remove duplicates
 def apply_nms(detections, config):
-    if not detections:
-        return []
-
-    boxes = [d["coords"] for d in detections]
-    confidences = [d["confidence"] for d in detections]
-
-    indices = cv.dnn.NMSBoxes(
-        boxes, confidences, config.CONFIDENCE_THRESHOLD, config.NMS_THRESHOLD
-    )
-
-    if hasattr(indices, "flatten"):
-        indices = indices  # .flatten()
-
-    if len(indices) > 0:
-        return [detections[i] for i in indices]
-
-    return []
+    return detections
 
 
 # Extract license plate regions from detected areas
@@ -106,14 +91,8 @@ def extract_plate_regions(image, detections, config):
     for i, detection in enumerate(detections):
         x, y, w, h = detection["coords"]
 
-        # Add padding around detected region
-        x_start = max(0, x - config.PLATE_PADDING)
-        y_start = max(0, y - config.PLATE_PADDING)
-        x_end = min(image.shape[1], x + w + config.PLATE_PADDING)
-        y_end = min(image.shape[0], y + h + config.PLATE_PADDING)
-
         # Extract plate region
-        plate_region = image[y_start:y_end, x_start:x_end]
+        plate_region = image[y : y + h, x : x + w]
 
         if plate_region.size > 0:
             plate_regions.append(
@@ -163,35 +142,42 @@ def draw_bounding_box(image, detection, index, config, processed_available=False
 # Draw bounding boxes on image
 def draw_results(image, detections, config, processed_available=False):
     result = image.copy()
-
-    for i, detection in enumerate(detections):
-        draw_bounding_box(result, detection, i, config, processed_available)
-
+    if detections:
+        draw_bounding_box(result, detections[0], 0, config, processed_available)
     return result
 
 
-def preprocess_plates(plate_regions, show_preprocessing=False):
-    processed_plates = []
-    for plate_info in plate_regions:
-        print(f"Log: Preprocessing plate {plate_info['index'] + 1}...")
-        preprocessing_results = preprocess_plate(
-            plate_info["image"], show_steps=show_preprocessing
-        )
-        if preprocessing_results:
-            processed_plates.append(
-                {
-                    "original": preprocessing_results["original"],
-                    "final": preprocessing_results["final"],
-                    "all_steps": preprocessing_results,
-                    "coords": plate_info["coords"],
-                    "confidence": plate_info["confidence"],
-                }
-            )
-            print(f"Log: Plate {plate_info['index'] + 1} preprocessed successfully")
-        else:
-            processed_plates.append(None)
-            print(f"Error: Failed to preprocess plate {plate_info['index'] + 1}")
-    return processed_plates
+def preprocess_plates(image, plate_regions, config, show_preprocessing=False):
+    if not plate_regions:
+        return []
+
+    plate_info = plate_regions[0]
+    print("Log: Preprocessing plate...")
+
+    # Add padding to the plate image
+    x, y, w, h = plate_info["coords"]
+    x_start = max(0, x - config.PLATE_PADDING)
+    y_start = max(0, y - config.PLATE_PADDING)
+    x_end = min(image.shape[1], x + w + config.PLATE_PADDING)
+    y_end = min(image.shape[0], y + h + config.PLATE_PADDING)
+    padded_plate = image[y_start:y_end, x_start:x_end]
+
+    preprocessing_results = preprocess_plate(
+        padded_plate, show_steps=show_preprocessing
+    )
+    if preprocessing_results:
+        return [
+            {
+                "original": plate_info["image"],
+                "final": preprocessing_results["final"],
+                "all_steps": preprocessing_results,
+                "coords": plate_info["coords"],
+                "confidence": plate_info["confidence"],
+            }
+        ]
+    else:
+        print("Error: Failed to preprocess plate")
+        return [None]
 
 
 def run_detection(net, image, config):
@@ -207,7 +193,7 @@ def run_detection(net, image, config):
 
 def detect_plates(
     image_path,
-    config=AppConfig(),
+    config=ModelConfig(),
     show_preprocessing=False,
 ):
     # Load image
@@ -225,8 +211,6 @@ def detect_plates(
     net = load_network(config.MODEL_CONFIG, config.MODEL_WEIGHTS)
     final_detections = run_detection(net, image, config)
 
-    print(f"Log: Found {len(final_detections)} license plate(s)")
-
     if not final_detections:
         return {"detections": [], "processed_plates": [], "result_image": image}
 
@@ -234,7 +218,9 @@ def detect_plates(
     plate_regions = extract_plate_regions(image, final_detections, config)
 
     # Apply preprocessing to each detected plate
-    processed_plates = preprocess_plates(plate_regions, show_preprocessing)
+    processed_plates = preprocess_plates(
+        image, plate_regions, config, show_preprocessing
+    )
 
     # Create result image
     result_image = draw_results(
@@ -288,7 +274,7 @@ def show_plate_comparison(i, plate_data, config):
     cv.imshow(f"Plate {i + 1}: Before vs After", comparison)
 
 
-def show_results(results, config=AppConfig()):
+def show_results(results, config=ModelConfig()):
     """Display detection and preprocessing results."""
     if not results or not results["detections"]:
         print("No results to display")
@@ -298,16 +284,15 @@ def show_results(results, config=AppConfig()):
     cv.imshow("Detection Results", results["result_image"])
 
     # Show individual plate comparisons
-    for i, plate_data in enumerate(results["processed_plates"]):
-        if plate_data:
-            show_plate_comparison(i, plate_data, config)
+    if results["processed_plates"] and results["processed_plates"][0]:
+        show_plate_comparison(0, results["processed_plates"][0], config)
 
     print("Press any key to close windows...")
     cv.waitKey(0)
     cv.destroyAllWindows()
 
 
-def save_results(results, config=AppConfig()):
+def save_results(results, config=ModelConfig()):
     """Save processing results to files."""
     if not results or not results["detections"]:
         return
@@ -318,14 +303,9 @@ def save_results(results, config=AppConfig()):
     cv.imwrite(f"{config.OUTPUT_DIR}/detection_result.jpg", results["result_image"])
 
     # Save individual plates
-    for i, plate_data in enumerate(results["processed_plates"]):
-        if plate_data:
-            cv.imwrite(
-                f"{config.OUTPUT_DIR}/plate_{i + 1}_original.jpg",
-                plate_data["original"],
-            )
-            cv.imwrite(
-                f"{config.OUTPUT_DIR}/plate_{i + 1}_processed.jpg", plate_data["final"]
-            )
+    if results["processed_plates"] and results["processed_plates"][0]:
+        plate_data = results["processed_plates"][0]
+        cv.imwrite(f"{config.OUTPUT_DIR}/plate_original.jpg", plate_data["original"])
+        cv.imwrite(f"{config.OUTPUT_DIR}/plate_processed.jpg", plate_data["final"])
 
     print(f"💾 Results saved to {config.OUTPUT_DIR}/")

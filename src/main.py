@@ -1,11 +1,11 @@
-from detect import detect_plates, save_results, show_results
+from detect import detect_plates, show_results
 
 
 def main():
     # Run detection and preprocessing
     print("Log: Begin detection")
 
-    results = detect_plates("images/3cars.jpg", show_preprocessing=False)
+    results = detect_plates("images/car-sl.jpg", show_preprocessing=False)
 
     if results is None:
         return
