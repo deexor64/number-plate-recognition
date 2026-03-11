@@ -54,27 +54,6 @@ def sharpen_image(image):
     return cv.filter2D(image, -1, kernel)
 
 
-# def clean_noise(binary_image):
-#     """
-#     DIP Technique: Morphological Opening/Closing to remove noise.
-#     """
-#     # Create a small 3x3 kernel
-#     kernel = np.ones((3, 3), np.uint8)
-
-#     # 1. Opening: Removes small white noise (dots) from the background
-#     # 2. Closing: Fills small black holes inside characters
-#     # Since our license plates usually have black text on white backgrounds,
-#     # we need to be careful with which one we apply.
-
-#     # Let's use Median Blur first - it's the 'king' of removing salt-and-pepper noise
-#     cleaned = cv.medianBlur(binary_image, 3)
-
-#     # Morphological Opening to remove small 'specks'
-#     cleaned = cv.morphologyEx(cleaned, cv.MORPH_OPEN, kernel)
-
-#     return cleaned
-
-
 # Apply complete preprocessing pipeline to a license plate image
 def preprocess_plate(plate_image):
     if plate_image is None or plate_image.size == 0:
