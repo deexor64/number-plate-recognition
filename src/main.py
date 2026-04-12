@@ -72,16 +72,32 @@ def process():
         2,
     )
 
+    # Create the list in the exact order of your pipeline
     # Prepare ALL intermediate steps for the frontend
-    encoded_process_steps = {}
-    for step_name, img_data in processed.items():
-        encoded_process_steps[step_name] = encode_image(img_data)
+    step_order = [
+        "gray",
+        "resized",
+        "denoised",
+        "contrast_enhanced",
+        "sharpened",
+        "final",
+    ]
+    ordered_steps = []
+
+    for key in step_order:
+        if key in processed:
+            ordered_steps.append(
+                {
+                    "name": key.replace("_", " ").title(),  # e.g., "Contrast Enhanced"
+                    "img": encode_image(processed[key]),
+                }
+            )
 
     # Prepare data for UI
     response = {
         "original": encode_image(display_img),
         "cropped": encode_image(results["cropped_image"]),
-        "steps": encoded_process_steps,
+        "pipeline_steps": ordered_steps,
         "text": plate_text,
     }
 
