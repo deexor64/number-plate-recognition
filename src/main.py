@@ -72,11 +72,16 @@ def process():
         2,
     )
 
+    # Prepare ALL intermediate steps for the frontend
+    encoded_process_steps = {}
+    for step_name, img_data in processed.items():
+        encoded_process_steps[step_name] = encode_image(img_data)
+
     # Prepare data for UI
     response = {
         "original": encode_image(display_img),
         "cropped": encode_image(results["cropped_image"]),
-        "processed": encode_image(processed["final"]),
+        "steps": encoded_process_steps,
         "text": plate_text,
     }
 

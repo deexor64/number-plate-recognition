@@ -56,70 +56,55 @@
                         class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-700 mx-auto"
                     ></div>
                     <p class="mt-4 text-indigo-600 font-medium">
-                        Processing DIP Algorithms...
+                        Processing...
                     </p>
                 </div>
 
                 <div
                     id="results"
-                    class="hidden grid grid-cols-1 md:grid-cols-3 gap-6"
+                    class="hidden grid grid-cols-1 lg:grid-cols-4 gap-6"
                 >
-                    <div class="md:col-span-2 glass rounded-2xl p-4 shadow-xl">
-                        <h3
-                            class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3"
-                        >
-                            Vehicle Detection
-                        </h3>
-                        <img
-                            id="res-original"
-                            class="w-full rounded-lg"
-                            src=""
-                        />
-                    </div>
-
-                    <div class="space-y-6">
+                    <div class="lg:col-span-3 space-y-6">
                         <div class="glass rounded-2xl p-4 shadow-xl">
                             <h3
                                 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3"
                             >
-                                Detected Number
+                                Plate Detection
+                            </h3>
+                            <img
+                                id="res-original"
+                                class="w-full rounded-lg"
+                                src=""
+                            />
+                        </div>
+
+                        <div
+                            class="glass rounded-2xl p-6 shadow-xl border-t-4 border-indigo-500"
+                        >
+                            <h3
+                                class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3 text-center"
+                            >
+                                Final Recognized Plate Number
                             </h3>
                             <div
                                 id="res-text"
-                                class="text-4xl font-mono font-bold text-indigo-800 bg-indigo-50 p-4 rounded-lg text-center border-2 border-indigo-200"
+                                class="text-6xl font-mono font-bold text-indigo-800 bg-indigo-50 p-6 rounded-lg text-center tracking-widest"
                             >
                                 ---
                             </div>
                         </div>
-                        <div class="glass rounded-2xl p-4 shadow-xl">
-                            <h3
-                                class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3"
-                            >
-                                DIP Preprocessing
-                            </h3>
-                            <div class="grid grid-cols-1 gap-4">
-                                <div>
-                                    <p class="text-xs text-slate-400 mb-1">
-                                        Cropped Plate
-                                    </p>
-                                    <img
-                                        id="res-cropped"
-                                        class="w-full rounded border"
-                                        src=""
-                                    />
-                                </div>
-                                <div>
-                                    <p class="text-xs text-slate-400 mb-1">
-                                        Processed Image
-                                    </p>
-                                    <img
-                                        id="res-processed"
-                                        class="w-full rounded border bg-black"
-                                        src=""
-                                    />
-                                </div>
-                            </div>
-                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <h3
+                            class="text-sm font-semibold uppercase tracking-wider text-slate-400"
+                        >
+                            DIP Pipeline Steps
+                        </h3>
+                        <div
+                            id="steps-container"
+                            class="space-y-4 overflow-y-auto max-h-[800px] pr-2"
+                        ></div>
                     </div>
                 </div>
             </div>
@@ -169,14 +154,32 @@
                             alert(data.error);
                         } else {
                             results.classList.remove("hidden");
+
                             document.getElementById("res-original").src =
                                 "data:image/jpeg;base64," + data.original;
-                            document.getElementById("res-cropped").src =
-                                "data:image/jpeg;base64," + data.cropped;
-                            document.getElementById("res-processed").src =
-                                "data:image/jpeg;base64," + data.processed;
                             document.getElementById("res-text").innerText =
                                 data.text || "NOT FOUND";
+
+                            const stepsContainer =
+                                document.getElementById("steps-container");
+                            stepsContainer.innerHTML = ""; // Clear old results
+
+                            Object.keys(data.steps).forEach((stepName) => {
+                                const stepWrapper =
+                                    document.createElement("div");
+                                stepWrapper.className =
+                                    "glass rounded-xl p-3 shadow-sm border border-slate-200";
+
+                                const formattedName = stepName
+                                    .replace(/_/g, " ")
+                                    .toUpperCase();
+
+                                stepWrapper.innerHTML = `
+                                    <p class="text-[10px] font-bold text-slate-500 mb-1">${formattedName}</p>
+                                    <img class="w-full rounded border bg-slate-900" src="data:image/jpeg;base64,${data.steps[stepName]}" />
+                                `;
+                                stepsContainer.appendChild(stepWrapper);
+                            });
                         }
                     });
             }
