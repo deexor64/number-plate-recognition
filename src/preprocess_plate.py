@@ -11,7 +11,7 @@ def gray_scale(image):
     return gray
 
 
-def resize_plate(image, target_width=300):
+def resize_plate(image, target_width=370):
     height, width = image.shape[:2]
     if width < target_width:
         scale = target_width / width
