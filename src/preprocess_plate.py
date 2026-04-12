@@ -54,30 +54,65 @@ def sharpen_image(image):
     return cv.filter2D(image, -1, kernel)
 
 
+def blur_image(image, level=7):
+    blurred = cv.GaussianBlur(image, (level, level), 0)
+    return blurred
+
+
+def binary_image(image):
+    _, binaried = cv.threshold(image, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+    return binaried
+
+
+def erod_image(image, kernel_size=2, iterations=1):
+    kernel = np.ones((kernel_size, kernel_size), np.uint8)
+    eroded = cv.erode(image, kernel, iterations=iterations)
+
+    return eroded
+
+
+def thin_image(image, kernel_size=2, iterations=1):
+    kernel = np.ones((kernel_size, kernel_size), np.uint8)
+    # Dilation expands white areas, effectively thinning black text
+    thinner = cv.dilate(image, kernel, iterations=iterations)
+    return thinner
+
+
+def adjust_brightness(image, alpha=0.7):
+    darkened = cv.convertScaleAbs(image, alpha=alpha, beta=0)
+    return darkened
+
+
 # Apply complete preprocessing pipeline to a license plate image
 def preprocess_plate(plate_image):
     if plate_image is None or plate_image.size == 0:
         return None
 
-    # Convert to grayscale
-    current = gray_scale(plate_image)
-    results = [("gray", current.copy())]
+    results = [("cropped", plate_image)]
 
-    # Resize for optimal processing
-    current = resize_plate(current)
+    current = resize_plate(plate_image)
     results.append(("resized", current.copy()))
 
-    # Reduce noise
+    current = gray_scale(current)
+    results.append(("gray", current.copy()))
+
     current = reduce_noise(current)
     results.append(("denoised", current.copy()))
 
-    # Enhance contrast
-    current = enhance_contrast(current)
-    results.append(("enhanced", current.copy()))
+    current = erod_image(current, kernel_size=3, iterations=2)
+    results.append(("eroded", current.copy()))
 
-    # Sharpen image
-    current = sharpen_image(current)
-    results.append(("sharpened", current.copy()))
+    # current = blur_image(current, level=15)
+    # results.append(("blurred", current.copy()))
+
+    # current = adjust_brightness(current, 1.5)
+    # results.append(("brighted", current.copy()))
+
+    current = binary_image(current)
+    results.append(("binary", current.copy()))
+
+    # current = thin_image(current, kernel_size=2, iterations=1)
+    # results.append(("thinned", current.copy()))
 
     results.append(("final", current.copy()))
     return results
