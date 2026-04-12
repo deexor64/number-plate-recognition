@@ -162,23 +162,20 @@
 
                             const stepsContainer =
                                 document.getElementById("steps-container");
-                            stepsContainer.innerHTML = ""; // Clear old results
+                            stepsContainer.innerHTML = "";
 
-                            Object.keys(data.steps).forEach((stepName) => {
-                                const stepWrapper =
-                                    document.createElement("div");
-                                stepWrapper.className =
-                                    "glass rounded-xl p-3 shadow-sm border border-slate-200";
-
-                                const formattedName = stepName
-                                    .replace(/_/g, " ")
-                                    .toUpperCase();
-
-                                stepWrapper.innerHTML = `
-                                    <p class="text-[10px] font-bold text-slate-500 mb-1">${formattedName}</p>
-                                    <img class="w-full rounded border bg-slate-900" src="data:image/jpeg;base64,${data.steps[stepName]}" />
+                            data.pipeline_steps.forEach((step) => {
+                                const html = `
+                                    <div class="glass rounded-xl p-3 shadow-sm border border-slate-200 mb-4">
+                                        <p class="text-[10px] font-bold text-indigo-600 mb-1">${step.name}</p>
+                                        <img class="w-full rounded border bg-slate-900"
+                                             src="data:image/jpeg;base64,${step.img}" />
+                                    </div>
                                 `;
-                                stepsContainer.appendChild(stepWrapper);
+                                stepsContainer.insertAdjacentHTML(
+                                    "beforeend",
+                                    html,
+                                );
                             });
                         }
                     });
