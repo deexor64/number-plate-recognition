@@ -56,7 +56,8 @@ def process():
         os.remove(temp_path)
         return jsonify({"error": "Failed to preprocess plate"}), 400
 
-    plate_text = perform_ocr(processed["final"])
+    final = next((tup for tup in processed if tup[0] == "final"), (""))[1]
+    plate_text = perform_ocr(final)
 
     # Draw bounding box on original image for display
     x, y, w, h = results["coords"]
@@ -72,32 +73,22 @@ def process():
         2,
     )
 
-    # Create the list in the exact order of your pipeline
     # Prepare ALL intermediate steps for the frontend
-    step_order = [
-        "gray",
-        "resized",
-        "denoised",
-        "contrast_enhanced",
-        "sharpened",
-        "final",
-    ]
-    ordered_steps = []
+    pipeline_steps = []
 
-    for key in step_order:
-        if key in processed:
-            ordered_steps.append(
-                {
-                    "name": key.replace("_", " ").title(),  # e.g., "Contrast Enhanced"
-                    "img": encode_image(processed[key]),
-                }
-            )
+    for item in processed:
+        pipeline_steps.append(
+            {
+                "name": item[0].replace("_", " ").title(),
+                "img": encode_image(item[1]),
+            }
+        )
 
     # Prepare data for UI
     response = {
         "original": encode_image(display_img),
         "cropped": encode_image(results["cropped_image"]),
-        "pipeline_steps": ordered_steps,
+        "pipeline_steps": pipeline_steps,
         "text": plate_text,
     }
 

@@ -61,26 +61,23 @@ def preprocess_plate(plate_image):
 
     # Convert to grayscale
     current = gray_scale(plate_image)
-    results = {"gray": current.copy()}
+    results = [("gray", current.copy())]
 
     # Resize for optimal processing
     current = resize_plate(current)
-    results["resized"] = current.copy()
-    results["final"] = current.copy()
+    results.append(("resized", current.copy()))
 
     # Reduce noise
     current = reduce_noise(current)
-    results["denoised"] = current.copy()
-    results["final"] = current.copy()
+    results.append(("denoised", current.copy()))
 
     # Enhance contrast
     current = enhance_contrast(current)
-    results["contrast_enhanced"] = current.copy()
-    results["final"] = current.copy()
+    results.append(("enhanced", current.copy()))
 
     # Sharpen image
     current = sharpen_image(current)
-    results["sharpened"] = current.copy()
-    results["final"] = current.copy()
+    results.append(("sharpened", current.copy()))
 
+    results.append(("final", current.copy()))
     return results
