@@ -4,7 +4,7 @@ A lightweight, OpenCV based tool for Number Plate Recognition (ANPR) and Reading
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 ![Main Dashboard](screenshots/screenshot1.png)
 
@@ -12,7 +12,7 @@ A lightweight, OpenCV based tool for Number Plate Recognition (ANPR) and Reading
 
 ---
 
-## 🚀 Features
+## Features
 - **Vehicle Detection:** Uses YOLOv3 (Darknet) to identify vehicles and plates.
 - **Image Processing:** Adjustable pipeline for grayscale conversion, noise reduction, thresholding and other preprocessings.
 - **OCR engine:** Tesseract configuration for license plate alphanumeric strings.
@@ -20,7 +20,7 @@ A lightweight, OpenCV based tool for Number Plate Recognition (ANPR) and Reading
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 - **Python 3.12**
 - **Flask** (Web Framework)
 - **OpenCV** (Image Processing)
@@ -29,7 +29,7 @@ A lightweight, OpenCV based tool for Number Plate Recognition (ANPR) and Reading
 
 ---
 
-## 📦 Setup & Installation
+## Setup & Installation
 
 - Install **Python 3.12**
 - Install **Tesseract OCR** on your system:
@@ -45,7 +45,7 @@ A lightweight, OpenCV based tool for Number Plate Recognition (ANPR) and Reading
 
 ___
 
-## 📜 Credits & Acknowledgments
+## Credits & Acknowledgments
 
 This project utilizes the **YOLOv3** object detection architecture. 
 
